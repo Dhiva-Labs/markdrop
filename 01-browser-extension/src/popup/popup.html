@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { --bg:#171b23; --card:#1f2430; --text:#e6e9ef; --muted:#8b93a5; --accent:#6366f1; --ok:#3ecf8e; --err:#f97066; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f6f7f9; --card:#ffffff; --text:#1c2330; --muted:#667085; --accent:#4f46e5; --ok:#12805c; --err:#b42318; }
+  }
+  body { width: 380px; margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.45 system-ui, sans-serif; }
+  .wrap { padding: 12px; }
+  h1 { font-size: 14px; margin: 0 0 10px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button.mode { background: var(--card); color: var(--text); border: 1px solid #2a3040;
+    border-radius: 9px; padding: 9px 6px; font: inherit; cursor: pointer; }
+  button.mode:hover { border-color: var(--accent); }
+  .yt { display: flex; gap: 6px; margin-top: 10px; }
+  .yt input { flex: 1; background: var(--card); color: var(--text); border: 1px solid #2a3040;
+    border-radius: 8px; padding: 8px; font: inherit; }
+  .yt button, .actions button { background: var(--accent); color: #fff; border: 0;
+    border-radius: 8px; padding: 8px 12px; font: inherit; cursor: pointer; }
+  label.ts { display: flex; align-items: center; gap: 6px; color: var(--muted); margin-top: 6px; }
+  #status { margin-top: 8px; color: var(--muted); min-height: 16px; }
+  #status.err { color: var(--err); } #status.ok { color: var(--ok); }
+  #out { display: none; margin-top: 8px; }
+  #out.show { display: block; }
+  textarea { width: 100%; height: 180px; box-sizing: border-box; background: var(--card);
+    color: var(--text); border: 1px solid #2a3040; border-radius: 8px; padding: 8px;
+    font: 11px/1.5 ui-monospace, monospace; resize: vertical; }
+  .actions { display: flex; gap: 6px; margin-top: 6px; }
+  .foot { margin-top: 10px; display: flex; justify-content: space-between; color: var(--muted); }
+  .foot a { color: var(--accent); text-decoration: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Markdrop Clipper</h1>
+  <div class="grid">
+    <button class="mode" id="btn-article">📄 Article</button>
+    <button class="mode" id="btn-full">🗎 Full page</button>
+    <button class="mode" id="btn-selection">✂️ Selection</button>
+    <button class="mode" id="btn-picker">🎯 Pick element</button>
+  </div>
+
+  <div class="yt">
+    <input id="yt-url" type="url" placeholder="YouTube link → transcript md">
+    <button id="btn-yt">Go</button>
+  </div>
+  <label class="ts"><input type="checkbox" id="yt-ts"> timestamped transcript</label>
+
+  <div id="status"></div>
+
+  <div id="out">
+    <textarea id="md" spellcheck="false"></textarea>
+    <div class="actions">
+      <button id="btn-copy">Copy</button>
+      <button id="btn-dl">Download .md</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span id="meta"></span>
+    <a id="open-options">Options</a>
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+.venv/
+.buildpython/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+dist/
+dist-firefox/
+dist-zips/
+build/
+*.egg-info/
+*.spec
+
+# Upstream source snapshot — local lookup copy only (see notes/markitdown-analysis.md)
+reference/
+
+# Big binaries go to GitHub Releases, not the repo
+*.deb
+*.apk
+
+# Keep the store-ready release folder (small) but not its rebuildable zip? No —
+# the CWS zip is ~40 KB and pinning the exact submitted artifact is useful.
+!01-browser-extension/release/*.zip

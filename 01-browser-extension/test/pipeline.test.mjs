@@ -1,0 +1,121 @@
+// node --test: markdown pipeline + YouTube parsing, using jsdom for DOM APIs.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import { JSDOM } from "jsdom";
+
+// Turndown needs a DOM; give it one globally before importing the lib
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "https://example.com/post" });
+globalThis.window = dom.window;
+globalThis.document = dom.window.document;
+globalThis.HTMLElement = dom.window.HTMLElement;
+globalThis.Node = dom.window.Node;
+
+const { htmlToMarkdown, composeDocument, filenameFor, frontMatter } = await import("../src/lib/markdown.js");
+const yt = await import("../src/lib/youtube.js");
+
+test("headings, emphasis, lists become ATX/GFM markdown", () => {
+  const md = htmlToMarkdown(`
+    <h1>Title</h1><h2>Sub</h2>
+    <p>Some <strong>bold</strong> and <em>italic</em>.</p>
+    <ul><li>one</li><li>two</li></ul>`);
+  assert.match(md, /^# Title/m);
+  assert.match(md, /^## Sub/m);
+  assert.match(md, /\*\*bold\*\*/);
+  assert.match(md, /^-\s+one/m);
+});
+
+test("tables become GFM pipe tables", () => {
+  const md = htmlToMarkdown(`
+    <table><thead><tr><th>A</th><th>B</th></tr></thead>
+    <tbody><tr><td>1</td><td>2</td></tr></tbody></table>`);
+  assert.match(md, /\| A \| B \|/);
+  assert.match(md, /\| 1 \| 2 \|/);
+});
+
+test("javascript: links are stripped to plain text", () => {
+  const md = htmlToMarkdown(`<a href="javascript:alert(1)">click</a> <a href="https://x.dev/p">ok</a>`);
+  assert.ok(!md.includes("javascript:"));
+  assert.match(md, /\[ok\]\(https:\/\/x\.dev\/p\)/);
+});
+
+test("data: URI images are truncated by default", () => {
+  const md = htmlToMarkdown(`<img alt="pix" src="data:image/png;base64,AAAABBBBCCCC">`);
+  assert.match(md, /!\[pix\]\(data:image\/png;base64\.\.\.\)/);
+});
+
+test("checkboxes become [x]/[ ]", () => {
+  const md = htmlToMarkdown(`<ul><li><input type="checkbox" checked>done</li><li><input type="checkbox">todo</li></ul>`);
+  assert.match(md, /\[x\]\s*done/);
+  assert.match(md, /\[ \]\s*todo/);
+});
+
+test("composeDocument adds suite front-matter", () => {
+  const doc = composeDocument({ title: "T", source: "https://s", markdown: "body" });
+  assert.match(doc, /^---\ntitle: T\nsource: https:\/\/s\nconverted: \d{4}-\d{2}-\d{2}\ngenerator: dhiva-labs\/markdrop-clipper\n---\n\nbody\n$/);
+});
+
+test("filenameFor sanitizes titles", () => {
+  assert.equal(filenameFor("Hello, World! (2024)"), "Hello-World-2024.md");
+  assert.equal(filenameFor(""), "converted.md");
+});
+
+test("frontMatter omits empty titles", () => {
+  assert.ok(!frontMatter({ title: "", source: "x" }).includes("title:"));
+});
+
+// --- YouTube parsing --------------------------------------------------------
+
+const FAKE_PR = {
+  videoDetails: {
+    title: "Test Video",
+    author: "Test Channel",
+    shortDescription: "A description",
+    lengthSeconds: "19",
+    viewCount: "12345",
+  },
+  captions: {
+    playerCaptionsTracklistRenderer: {
+      captionTracks: [
+        { languageCode: "de", baseUrl: "https://yt/de" },
+        { languageCode: "en", baseUrl: "https://yt/en" },
+      ],
+    },
+  },
+};
+
+test("parsePlayerResponse finds the JSON blob in page HTML", () => {
+  const html = `<html><script>var ytInitialPlayerResponse = ${JSON.stringify(FAKE_PR)};var other=1;</script></html>`;
+  const pr = yt.parsePlayerResponse(html);
+  assert.equal(pr.videoDetails.title, "Test Video");
+});
+
+test("captionTrackUrl prefers exact english", () => {
+  assert.equal(yt.captionTrackUrl(FAKE_PR), "https://yt/en");
+});
+
+test("json3 transcript parsing + timestamped build", () => {
+  const segs = yt.parseJson3Transcript({
+    events: [
+      { tStartMs: 1000, segs: [{ utf8: "hello " }, { utf8: "world" }] },
+      { tStartMs: 65000, segs: [{ utf8: "later" }] },
+      { tStartMs: 70000 }, // no segs -> skipped
+    ],
+  });
+  assert.equal(segs.length, 2);
+  const md = yt.buildVideoMarkdown(yt.metadataFromPlayerResponse(FAKE_PR), segs, { timestamps: true });
+  assert.match(md, /## Test Video/);
+  assert.match(md, /\[00:00:01\] hello world/);
+  assert.match(md, /\[00:01:05\] later/);
+  assert.match(md, /\*\*Duration:\*\* 00:00:19/);
+});
+
+test("extractVideoId handles watch/short/share URLs", () => {
+  for (const u of [
+    "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "https://youtu.be/jNQXAC9IVRw?t=5",
+    "https://www.youtube.com/shorts/jNQXAC9IVRw",
+  ]) {
+    assert.equal(yt.extractVideoId(u), "jNQXAC9IVRw");
+  }
+});

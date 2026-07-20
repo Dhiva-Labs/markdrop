@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { max-width: 560px; margin: 40px auto; font: 14px/1.6 system-ui, sans-serif; color: #1c2330; padding: 0 16px; }
+  @media (prefers-color-scheme: dark) { body { background: #0e1116; color: #e6e9ef; } input[type=url], input[type=text] { background: #171b23; color: #e6e9ef; border-color: #2a3040 !important; } }
+  h1 { font-size: 18px; }
+  label.row { display: block; margin: 14px 0; }
+  input[type=url], input[type=text] { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 8px; font: inherit; margin-top: 4px; }
+  .hint { color: #667085; font-size: 12px; }
+  button { background: #4f46e5; color: #fff; border: 0; border-radius: 8px; padding: 9px 18px; font: inherit; cursor: pointer; margin-top: 10px; }
+  #saved { color: #12805c; margin-left: 10px; }
+</style>
+</head>
+<body>
+  <h1>Markdrop Clipper — Options · from Dhiva Labs</h1>
+
+  <label class="row"><input type="checkbox" id="frontMatter"> Include front-matter block (title / source / date)</label>
+  <label class="row"><input type="checkbox" id="keepDataUris"> Keep data: URI images (large output)</label>
+
+  <label class="row">Conversion API endpoint (optional)
+    <input type="url" id="apiUrl" placeholder="http://127.0.0.1:8460">
+    <span class="hint">The md-files-dhivalabs web API (project 04). Enables converting linked PDFs/Office files in a future update. Leave empty to disable.</span>
+  </label>
+  <label class="row">API key (optional)
+    <input type="text" id="apiKey" placeholder="X-API-Key value if the API requires one">
+  </label>
+
+  <button id="save">Save</button><span id="saved"></span>
+  <script src="options.js"></script>
+</body>
+</html>

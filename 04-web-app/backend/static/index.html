@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdrop — anything → Markdown · from Dhiva Labs</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1c2330; --muted: #667085;
+    --accent: #4f46e5; --accent-2: #6366f1; --border: #e4e7ec; --ok: #12805c; --err: #b42318;
+    --code-bg: #f2f4f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --card: #171b23; --text: #e6e9ef; --muted: #8b93a5;
+      --accent: #7c7ff2; --accent-2: #8b8ef7; --border: #2a3040; --ok: #3ecf8e; --err: #f97066;
+      --code-bg: #10141b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+  header h1 { font-size: 1.5rem; margin: 0; }
+  header .sub { color: var(--muted); font-size: .9rem; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs button { flex: 1; padding: 10px 0; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px; font-size: .95rem; cursor: pointer; }
+  .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 36px 16px; text-align: center; color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s; }
+  .drop.hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .drop strong { color: var(--text); }
+  .row { display: flex; gap: 8px; }
+  input[type=url] { flex: 1; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: .95rem; }
+  .btn { padding: 12px 20px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: var(--accent-2); }
+  .btn[disabled] { opacity: .5; cursor: wait; }
+  .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: 500; padding: 8px 14px; }
+  .status { margin: 14px 0 0; font-size: .9rem; color: var(--muted); }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); }
+  .result { margin-top: 20px; display: none; }
+  .result.show { display: block; }
+  .result-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .result-bar .title { font-weight: 600; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+  textarea#md-out { width: 100%; min-height: 380px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--code-bg); color: var(--text); font-family: ui-monospace, "Cascadia Code", monospace; font-size: .85rem; line-height: 1.5; resize: vertical; }
+  .hint { font-size: .8rem; color: var(--muted); margin-top: 10px; }
+  footer { margin-top: 40px; font-size: .8rem; color: var(--muted); text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Markdrop</h1>
+    <span class="sub">files · web pages · YouTube → Markdown</span>
+  </header>
+
+  <div class="tabs">
+    <button id="tab-file" class="active">Upload file</button>
+    <button id="tab-url">Web page / file URL</button>
+    <button id="tab-yt">YouTube</button>
+  </div>
+
+  <div class="card">
+    <section id="pane-file">
+      <div class="drop" id="drop">
+        <strong>Drop a file here</strong> or click to choose<br>
+        <span>pdf · docx · xlsx · pptx · epub · html · csv · ipynb · msg · zip · images · audio</span>
+      </div>
+      <input type="file" id="file-input" hidden>
+    </section>
+
+    <section id="pane-url" hidden>
+      <div class="row">
+        <input type="url" id="url-input" placeholder="https://example.com/article — or a direct link to a .pdf / .docx / …">
+        <button class="btn" id="url-go">Convert</button>
+      </div>
+      <p class="hint">Wikipedia and RSS feeds get special handling automatically.</p>
+    </section>
+
+    <section id="pane-yt" hidden>
+      <div class="row">
+        <input type="url" id="yt-input" placeholder="https://www.youtube.com/watch?v=…">
+        <button class="btn" id="yt-go">Get transcript</button>
+      </div>
+      <p class="hint">Returns title, channel, description and full transcript as Markdown.</p>
+    </section>
+
+    <p class="status" id="status"></p>
+
+    <div class="result" id="result">
+      <div class="result-bar">
+        <span class="title" id="result-title"></span>
+        <button class="btn ghost" id="copy-btn">Copy</button>
+        <button class="btn ghost" id="dl-btn">Download .md</button>
+      </div>
+      <textarea id="md-out" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <footer>Markdrop · from <strong>Dhiva Labs</strong> · powered by MarkItDown · <a href="/api/formats">supported formats</a></footer>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const panes = { file: $("pane-file"), url: $("pane-url"), yt: $("pane-yt") };
+  const tabs = { file: $("tab-file"), url: $("tab-url"), yt: $("tab-yt") };
+  let lastFilename = "converted.md";
+
+  for (const key of Object.keys(tabs)) {
+    tabs[key].addEventListener("click", () => {
+      for (const k of Object.keys(tabs)) {
+        tabs[k].classList.toggle("active", k === key);
+        panes[k].hidden = k !== key;
+      }
+    });
+  }
+
+  const status = (msg, cls = "") => { const el = $("status"); el.textContent = msg; el.className = "status " + cls; };
+  const busy = (on) => document.querySelectorAll(".btn").forEach(b => b.disabled = on);
+
+  function showResult(body, fallbackName) {
+    $("result").classList.add("show");
+    $("result-title").textContent = body.title || fallbackName || "Converted";
+    $("md-out").value = body.markdown;
+    const base = (body.title || fallbackName || "converted").replace(/[^\w\d-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+    lastFilename = (base || "converted") + ".md";
+    status("Done — " + body.markdown.length.toLocaleString() + " characters", "ok");
+  }
+
+  async function handleResponse(resp, fallbackName) {
+    let body;
+    try { body = await resp.json(); } catch { body = { error: "Bad response from server (" + resp.status + ")" }; }
+    if (resp.ok && body.ok) { showResult(body, fallbackName); }
+    else { status(body.error || body.detail || ("Failed with status " + resp.status), "err"); }
+  }
+
+  async function convertFile(file) {
+    status("Converting " + file.name + "…");
+    busy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const resp = await fetch("/api/convert/file", { method: "POST", body: fd });
+      await handleResponse(resp, file.name.replace(/\.[^.]+$/, ""));
+    } catch (e) { status("Network error: " + e.message, "err"); }
+    finally { busy(false); }
+  }
+
+  async function convertRemote(endpoint, url) {
+    if (!url) { status("Enter a URL first", "err"); return; }
+    status("Fetching and converting…");
+    busy(true);
+    try {
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      await handleResponse(resp, url);
+    } catch (e) { status("Network error: " + e.message, "err"); }
+    finally { busy(false); }
+  }
+
+  const drop = $("drop");
+  drop.addEventListener("click", () => $("file-input").click());
+  $("file-input").addEventListener("change", (e) => e.target.files[0] && convertFile(e.target.files[0]));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("hover"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("hover"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("hover");
+    if (e.dataTransfer.files[0]) convertFile(e.dataTransfer.files[0]);
+  });
+
+  $("url-go").addEventListener("click", () => convertRemote("/api/convert/url", $("url-input").value.trim()));
+  $("yt-go").addEventListener("click", () => convertRemote("/api/convert/youtube", $("yt-input").value.trim()));
+  $("url-input").addEventListener("keydown", (e) => e.key === "Enter" && $("url-go").click());
+  $("yt-input").addEventListener("keydown", (e) => e.key === "Enter" && $("yt-go").click());
+
+  $("copy-btn").addEventListener("click", async () => {
+    await navigator.clipboard.writeText($("md-out").value);
+    status("Copied to clipboard", "ok");
+  });
+  $("dl-btn").addEventListener("click", () => {
+    const blob = new Blob([$("md-out").value], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = lastFilename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+})();
+</script>
+</body>
+</html>
