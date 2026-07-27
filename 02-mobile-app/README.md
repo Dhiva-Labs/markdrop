@@ -2,7 +2,9 @@
 
 Flutter app with the real MarkItDown engine embedded on-device via Chaquopy.
 
-**Spike verdict (2026-07-20): GO ✅** — emulator-verified: Python 3.12.12 cold-starts in ~0.8 s, all converter modules import, and a real markitdown HTML→Markdown conversion completes in ~540 ms with correct front-matter, headings and GFM tables. Requires **Chaquopy 17.0.0** (16.x native wheels are 4 KB-aligned and crash on Android's new 16 KB page-size devices/emulators).
+**Status (2026-07-20): FULL APP, emulator-verified.** Share-sheet intake (files/links from any app), file picker (multi-select), URL + YouTube conversion, photo OCR via on-device ML Kit, library of past conversions, and per-result output choice: **Copy text / Share .md / Save file** (MediaStore -> Download/Markdrop/).
+
+Verified on emulator (16 KB page-size image, worst case): docx, pdf, jpg-OCR, html, epub, csv and live Wikipedia URL all convert (headless selftest hook `files/selftest/`); share-intent -> result screen -> Save-file flow screenshot-verified. pptx works only on 4 KB-page devices (most phones today) — python-pptx needs lxml, whose Android wheel is not yet 16 KB-aligned; degrades with a clear message. Plain video files are declined with a hint to use YouTube links (transcripts).
 
 ## Spike design
 - `app/android/app/build.gradle.kts` — Chaquopy 16.1 with pip `--no-deps` and a hand-picked dependency list: markitdown 0.1.6 **without magika** (magika needs onnxruntime, unavailable on Android) and **without pandas** (xlsx via markitdown is disabled for now to keep the APK small; openpyxl is staged for a custom converter later).

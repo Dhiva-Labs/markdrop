@@ -37,6 +37,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 trips over ML Kit's generated rules; the APK is dominated by
+            // the bundled Python anyway, so shrinking buys little.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -74,26 +78,26 @@ chaquopy {
             // docx
             install("mammoth==1.11.0")
             install("cobble==0.1.4")
+            // lxml + Pillow load on 4KB-page devices (most phones today);
+            // on 16KB-page devices they fail to dlopen and pptx degrades
+            // cleanly (docx/pdf/html/etc all still work — see README)
             install("lxml==5.3.0")
+            install("chaquopy-libxml2")
+            install("chaquopy-libxslt")
+            install("Pillow==11.0.0")
+            install("chaquopy-libjpeg")
+            install("chaquopy-libpng")
             // pptx
             install("python-pptx==1.0.2")
             install("XlsxWriter==3.2.9")
-            install("Pillow==11.0.0")
             install("typing-extensions==4.16.0")
             // xlsx (openpyxl instead of pandas — keeps the APK sane)
             install("openpyxl==3.1.5")
             install("et-xmlfile==2.0.0")
             // pdf (text extraction; pdfplumber/table support evaluated later)
             install("pdfminer.six==20250506")
-            install("cryptography==42.0.8")
-            // native support libs normally pulled transitively — --no-deps
-            // skips them, so list explicitly (runtime dlopen deps)
-            install("chaquopy-libxml2")   // lxml
-            install("chaquopy-libxslt")   // lxml
-            install("chaquopy-libjpeg")   // Pillow
-            install("chaquopy-libpng")    // Pillow
-            install("cffi")               // cryptography
-            install("pycparser")          // cffi
+            // youtube transcripts (pure python)
+            install("youtube-transcript-api==1.2.4")
         }
     }
     sourceSets {

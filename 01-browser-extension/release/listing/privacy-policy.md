@@ -21,4 +21,4 @@ The extension makes network requests only in two user-triggered cases:
 Any future change to this policy will be published at this same URL and reflected in the extension's listing before taking effect.
 
 ## Contact
-Dhiva Labs — dhivakar1010@gmail.com
+Dhiva Labs — hello@contact.dhivalabs.com
