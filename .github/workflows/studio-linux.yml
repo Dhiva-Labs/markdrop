@@ -1,0 +1,342 @@
+name: Markdrop Studio (Linux)
+
+# Builds Markdrop Studio, the desktop app in 03-desktop-app, for Linux x64 and
+# Linux arm64: the PyInstaller-frozen markitdown engine on the native runner,
+# the Flutter app, and a .deb that bundles both.
+#
+# When a release is published, the .debs are attached to it. The release itself
+# and the assets uploaded by hand are never touched: a file whose name is
+# already on the release is skipped, so a hand-built amd64 .deb wins and CI
+# fills in what is missing (the arm64 .deb). To attach the .debs to a release
+# that is already published, run this workflow by hand and give it the tag.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '03-desktop-app/**'
+      - '.github/workflows/studio-linux.yml'
+  pull_request:
+    paths:
+      - '03-desktop-app/**'
+      - '.github/workflows/studio-linux.yml'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Attach the .debs to this existing release (leave empty to only build)
+        type: string
+        default: ''
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+  PYTHON_VERSION: '3.12'
+  # The engine's golden tests read markitdown's own test files, so the tests
+  # are fetched from the git tag that matches this version.
+  MARKITDOWN_VERSION: '0.1.6'
+
+jobs:
+  version:
+    name: Package version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      deb_version: ${{ steps.v.outputs.deb_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: 03-desktop-app/packaging
+          sparse-checkout-cone-mode: false
+
+      # The .deb version is chosen by hand (packaging/deb-version). For a
+      # release the arm64 package follows the version of the amd64 package that
+      # release already carries, so the two always pair up.
+      - name: Work out the .deb version
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+        run: |
+          version="$(tr -d '[:space:]' < 03-desktop-app/packaging/deb-version)"
+          if [ -n "$TAG" ]; then
+            amd64="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              -q '.assets[].name' | sed -nE 's/^markdrop-studio_(.+)_amd64\.deb$/\1/p' | head -n 1)"
+            if [ -n "$amd64" ]; then
+              version="$amd64"
+            fi
+          fi
+          echo "deb version: $version"
+          echo "deb_version=$version" >> "$GITHUB_OUTPUT"
+
+  studio:
+    name: Studio ${{ matrix.arch }}
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            deb_arch: amd64
+            runner: ubuntu-24.04
+            elf_machine: x86-64
+          - arch: arm64
+            deb_arch: arm64
+            runner: ubuntu-24.04-arm
+            elf_machine: ARM aarch64
+    env:
+      ELF_MACHINE: ${{ matrix.elf_machine }}
+      DEB_VERSION: ${{ needs.version.outputs.deb_version }}
+      TEST_FILES: ${{ github.workspace }}/reference/markitdown/packages/markitdown/tests/test_files
+    steps:
+      - uses: actions/checkout@v7
+
+      # ---- engine (Python, PyInstaller) ---------------------------------------
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install the engine's dependencies
+        working-directory: 03-desktop-app/engine
+        run: |
+          python -c 'import platform, sys; print(platform.machine(), sys.version)'
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install \
+            "markitdown[pdf,docx,pptx,xlsx,xls,outlook,youtube-transcription]==${MARKITDOWN_VERSION}" \
+            pyinstaller pytest
+          .venv/bin/pip list
+
+      - name: Fetch markitdown's test files
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse --branch "v${MARKITDOWN_VERSION}" \
+            https://github.com/microsoft/markitdown.git reference/markitdown
+          git -C reference/markitdown sparse-checkout set packages/markitdown/tests/test_files
+          ls "$TEST_FILES" | head -n 30
+
+      - name: Engine golden tests
+        working-directory: 03-desktop-app/engine
+        run: .venv/bin/python -m pytest test_engine.py -v
+
+      - name: Freeze the engine with PyInstaller
+        working-directory: 03-desktop-app/engine
+        run: |
+          .venv/bin/pyinstaller --noconfirm --onedir --name md-engine \
+            --collect-all magika --collect-data pdfminer --collect-data olefile md_engine.py
+          du -sh dist/md-engine
+
+      - name: Assert every ELF file in the frozen engine is ${{ matrix.elf_machine }}
+        working-directory: 03-desktop-app/engine
+        run: |
+          [ -x dist/md-engine/md-engine ] || { echo "::error::dist/md-engine/md-engine missing"; exit 1; }
+          checked=0
+          bad=0
+          while IFS= read -r -d '' f; do
+            desc="$(file -b "$f")"
+            case "$desc" in ELF*) ;; *) continue ;; esac
+            checked=$((checked + 1))
+            case "$desc" in
+              *"$ELF_MACHINE"*) ;;
+              *) echo "::error file=$f::not $ELF_MACHINE: $desc"; bad=1 ;;
+            esac
+          done < <(find dist/md-engine -type f -print0)
+          file -b dist/md-engine/md-engine
+          echo "checked $checked ELF files"
+          [ "$checked" -ge 20 ] && [ "$bad" -eq 0 ]
+
+      # The frozen binary, not the Python script: this is what ships.
+      - name: Convert through the frozen engine
+        working-directory: 03-desktop-app/engine
+        run: |
+          dist/md-engine/md-engine formats | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d); assert d["ok"] and all(d["extras"].values()), d["extras"]'
+          check() {
+            src="$1"; needle="$2"
+            dist/md-engine/md-engine convert "$TEST_FILES/$src" > "$RUNNER_TEMP/frozen-$src.json"
+            python3 - "$RUNNER_TEMP/frozen-$src.json" "$src" "$needle" <<'PY'
+          import json, sys
+          body = json.load(open(sys.argv[1]))
+          assert body["ok"], body
+          assert sys.argv[3] in body["markdown"], f"{sys.argv[2]}: expected text missing"
+          print(f"{sys.argv[2]}: ok, {body['chars']} chars")
+          PY
+          }
+          check test.docx "AutoGen: Enabling Next-Gen LLM Applications"
+          check test.pdf "While there is contemporaneous exploration"
+          check test.pptx "2cdda5c8-e50e-4db4-b5f0-9722a649f455"
+          check test.xlsx "09060124-b5e7-4717-9d07-3c046eb"
+
+      # ---- app (Flutter) ------------------------------------------------------
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            file xvfb xauth dbus-x11
+
+      - name: Install Flutter ${{ env.FLUTTER_VERSION }}
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Flutter
+        run: |
+          uname -m
+          flutter config --no-analytics --enable-linux-desktop
+          flutter precache --linux
+          flutter --version
+          dart --version
+
+      - name: Get packages
+        working-directory: 03-desktop-app/app
+        run: flutter pub get
+
+      - name: Build the app
+        working-directory: 03-desktop-app/app
+        run: flutter build linux --release
+
+      - name: Assert every ELF file in the app bundle is ${{ matrix.elf_machine }}
+        working-directory: 03-desktop-app/app
+        run: |
+          BUNDLE=build/linux/${{ matrix.arch }}/release/bundle
+          for f in md_converter_desktop lib/libapp.so lib/libflutter_linux_gtk.so; do
+            [ -f "$BUNDLE/$f" ] || { echo "::error::missing $BUNDLE/$f"; exit 1; }
+          done
+          checked=0
+          bad=0
+          while IFS= read -r -d '' f; do
+            desc="$(file -b "$f")"
+            case "$desc" in ELF*) ;; *) continue ;; esac
+            echo "$f: $desc"
+            checked=$((checked + 1))
+            case "$desc" in
+              *"$ELF_MACHINE"*) ;;
+              *) echo "::error file=$f::not $ELF_MACHINE"; bad=1 ;;
+            esac
+          done < <(find "$BUNDLE" -type f -print0)
+          echo "checked $checked ELF files"
+          [ "$checked" -ge 5 ] && [ "$bad" -eq 0 ]
+
+      # ---- package ------------------------------------------------------------
+
+      - name: Build the .deb
+        run: |
+          03-desktop-app/packaging/build_deb.sh dist "$DEB_VERSION"
+          ls -l dist
+
+      - name: Check the .deb
+        run: |
+          DEB="dist/markdrop-studio_${DEB_VERSION}_${{ matrix.deb_arch }}.deb"
+          [ "$(ls dist | wc -l)" -eq 1 ]
+          [ -f "$DEB" ]
+          dpkg-deb --info "$DEB"
+          [ "$(dpkg-deb --field "$DEB" Architecture)" = "${{ matrix.deb_arch }}" ]
+          [ "$(dpkg-deb --field "$DEB" Package)" = "markdrop-studio" ]
+          dpkg-deb --contents "$DEB" | grep -v '/md-engine/_internal/' | head -n 40
+          sudo apt-get install -y "./$DEB"
+          file /opt/markdrop-studio/md_converter_desktop | tee /dev/stderr | grep "$ELF_MACHINE"
+          file /opt/markdrop-studio/md-engine/md-engine | tee /dev/stderr | grep "$ELF_MACHINE"
+          test -L /usr/bin/markdrop
+          test -f /usr/share/applications/markdrop-studio.desktop
+          test -f /usr/share/icons/hicolor/256x256/apps/markdrop-studio.png
+
+      # ---- run the installed package -------------------------------------------
+
+      # `markdrop --selftest <file>` starts the app (a GTK window on the virtual
+      # display), converts one file through the bundled sidecar, prints JSON and
+      # exits. It runs the AOT-compiled Dart code and the frozen engine together.
+      - name: App self-test of the installed package (Xvfb)
+        timeout-minutes: 10
+        run: |
+          unset MD_ENGINE
+          selftest() {
+            src="$1"
+            out="$RUNNER_TEMP/selftest-$src.json"
+            xvfb-run -a -s "-screen 0 1280x800x24" /usr/bin/markdrop --selftest "$TEST_FILES/$src" | tee "$out"
+            python3 - "$out" "$src" <<'PY'
+          import json, sys
+          lines = [l for l in open(sys.argv[1]).read().splitlines() if l.startswith("{")]
+          assert lines, "selftest printed no JSON"
+          body = json.loads(lines[-1])
+          assert body["selftest"] and body["ok"], body
+          assert body["chars"] > 200, body
+          assert body["engine"].startswith("/opt/markdrop-studio/md-engine/md-engine"), body["engine"]
+          print(f"{sys.argv[2]}: selftest ok, {body['chars']} chars via {body['engine']}")
+          PY
+          }
+          selftest test.docx
+          selftest test.pdf
+          selftest test.pptx
+          selftest test.xlsx
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Release assets
+    needs: [version, studio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      DEB_VERSION: ${{ needs.version.outputs.deb_version }}
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: deb-*
+          path: assets
+          merge-multiple: true
+
+      - name: Check the release assets
+        run: |
+          ls -l assets
+          [ "$(ls assets | wc -l)" -eq 2 ]
+          for arch in amd64 arm64; do
+            deb="assets/markdrop-studio_${DEB_VERSION}_${arch}.deb"
+            [ "$(dpkg-deb --field "$deb" Architecture)" = "$arch" ]
+            [ "$(dpkg-deb --field "$deb" Version)" = "$DEB_VERSION" ]
+          done
+
+      # Names already on the release are skipped (hand-uploaded files win), so
+      # nothing is overwritten. The checksums of what this job uploads go into
+      # their own file, because the release's SHA256SUMS.txt is kept by hand.
+      - name: Upload to release ${{ github.event.release.tag_name || inputs.release_tag }}
+        if: env.TAG != ''
+        run: |
+          existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
+          uploaded=0
+          : > SHA256SUMS-studio-linux.txt
+          for f in assets/*.deb; do
+            name="$(basename "$f")"
+            if printf '%s\n' "$existing" | grep -qxF -- "$name"; then
+              echo "skip $name (already on the release)"
+            else
+              echo "upload $name"
+              gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY"
+              (cd assets && sha256sum "$name") >> SHA256SUMS-studio-linux.txt
+              uploaded=$((uploaded + 1))
+            fi
+          done
+          if [ "$uploaded" -gt 0 ] && ! printf '%s\n' "$existing" | grep -qxF SHA256SUMS-studio-linux.txt; then
+            cat SHA256SUMS-studio-linux.txt
+            gh release upload "$TAG" SHA256SUMS-studio-linux.txt --repo "$GITHUB_REPOSITORY"
+          fi
