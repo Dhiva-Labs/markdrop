@@ -14,10 +14,35 @@ cd engine && uv venv .venv && uv pip install -p .venv/bin/python "markitdown[pdf
 .venv/bin/pyinstaller --noconfirm --onedir --name md-engine \
   --collect-all magika --collect-data pdfminer --collect-data olefile md_engine.py
 
-# app
+# app (Flutter does not cross-compile Linux: build on the architecture you want)
 cd ../app && flutter build linux --release
-./build/linux/x64/release/bundle/md_converter_desktop
+./build/linux/x64/release/bundle/md_converter_desktop      # on arm64: build/linux/arm64/release/bundle/
 ```
+
+The engine tests read markitdown's own test files from
+`reference/markitdown/packages/markitdown/tests/test_files` (git-ignored; CI fetches them from the
+matching markitdown tag).
+
+## Packaging (.deb for amd64 and arm64)
+`packaging/build_deb.sh` assembles `markdrop-studio_<version>_<arch>.deb` from `engine/dist/md-engine/`
+and `app/build/linux/<x64|arm64>/release/bundle/`. The architecture comes from `dpkg
+--print-architecture`, so build the engine and the app on the machine you package on. The package
+version is in `packaging/deb-version`; layout:
+
+```
+/opt/markdrop-studio/{md_converter_desktop,lib,data,md-engine,icon.png}
+/usr/bin/markdrop -> /opt/markdrop-studio/md_converter_desktop
+/usr/share/applications/markdrop-studio.desktop
+```
+
+```bash
+packaging/build_deb.sh dist           # writes dist/markdrop-studio_<version>_<arch>.deb
+xvfb-run -a markdrop --selftest some.docx   # headless check of the installed package
+```
+
+CI (`.github/workflows/studio-linux.yml`) does exactly this on `ubuntu-24.04` and `ubuntu-24.04-arm`,
+and on a published release attaches the `.deb` files that are not on it yet. To add them to a
+release that already exists, run the workflow by hand and give it the tag (`release_tag`).
 
 ## Features (v0.1)
 - Drop zone + file picker, URL/YouTube box, serial batch queue with per-job status.
@@ -25,8 +50,8 @@ cd ../app && flutter build linux --release
 - Engine status in the app bar; failures show the converter error inline.
 - **Headless self-test** for CI/agents: `md_converter_desktop --selftest <file>` converts through the real sidecar, prints JSON, exits (verified: docx → 4,803 chars).
 
-## Packaging plan (pending)
-Bundle `engine/dist/md-engine/` next to the app binary as `md-engine/` (sidecar looks there first), then .deb/AppImage; Windows/mac via CI — untested locally.
+## Packaging status
+The `.deb` for amd64 and arm64 is built in CI (see above). Still open: AppImage, and Windows/macOS builds.
 
 ## Remaining (per PLAN.md)
-Watch folders, clipboard watcher, output-folder batch export, .deb/AppImage packaging, Win/mac CI builds.
+Watch folders, clipboard watcher, output-folder batch export, AppImage packaging, Win/mac CI builds.

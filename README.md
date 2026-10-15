@@ -1,8 +1,32 @@
 # Markdrop (md-files-dhivalabs) — from Dhiva Labs
 
+[![ARM64 builds](https://github.com/Dhiva-Labs/markdrop/actions/workflows/studio-linux.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/markdrop/actions/workflows/studio-linux.yml)
+![Markdrop Studio: Linux x64 | arm64](https://img.shields.io/badge/Studio-Linux%20x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+
 **Markdrop** is the suite brand: Markdrop Clipper (extension), Markdrop (mobile), Markdrop Studio (desktop), Markdrop Web + API, markdrop-mcp (Claude connector), Markdrop Bot (Telegram). All products carry "from Dhiva Labs" attribution and emit front-matter generator strings `dhiva-labs/markdrop-<product>`.
 
 Multi-plan project built around Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) (file → Markdown conversion engine).
+
+## Install Markdrop Studio (Linux desktop)
+
+Markdrop Studio is released as a `.deb` for both Linux architectures. Take the one that matches
+`dpkg --print-architecture`:
+
+| Machine | Asset |
+|---|---|
+| x86-64 (`amd64`) | `markdrop-studio_<version>_amd64.deb` |
+| 64-bit ARM (`arm64`) | `markdrop-studio_<version>_arm64.deb` |
+
+```bash
+sudo apt install ./markdrop-studio_<version>_arm64.deb   # or ..._amd64.deb
+markdrop                                                   # or launch "Markdrop Studio" from the app menu
+```
+
+The package bundles the Flutter app and the frozen conversion engine (Python 3.12 and markitdown),
+so nothing else needs installing except GTK 3. CI builds both packages on native runners
+(`.github/workflows/studio-linux.yml`), runs the engine's golden tests and the app's
+`--selftest` on each architecture, and attaches them to published releases. They are built on
+Ubuntu 24.04, so they need that release's C library or newer.
 
 ## Layout
 - `MASTER_PLAN.md` — suite overview, shared architecture, build order, open questions.
