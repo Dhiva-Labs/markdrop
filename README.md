@@ -49,3 +49,15 @@ Ubuntu 24.04, so they need that release's C library or newer.
 - 2026-07-20: **06-telegram-bot built** — python-telegram-bot v21 thin client over the 04 API (documents/photos/URLs/YouTube, allowlist, /formats, 20 MB cap). 10 tests pass incl. live API round-trip. Needs MD_BOT_TOKEN from @BotFather for a real Telegram run.
 - 2026-07-20: **03-desktop-app Phases 1–2 done** — md-engine sidecar (JSON one-shot + warm stdio serve; 4 golden tests) frozen with PyInstaller (181 MB, works standalone); Flutter Linux app (dropzone, URL box, batch queue, rendered/raw preview, copy/save) built release + verified via headless `--selftest` (docx through real sidecar) + clean 10 s GUI launch. Remaining: watch folders, packaging, Win/mac CI.
 - 2026-07-20: **01-browser-extension Phases 1–3 done** — MD Clipper MV3 (article/full/selection modes, element picker with in-page toolbar, YouTube popup box with timestamped transcripts, context menus, keyboard shortcut, options). 12 node tests pass; dist/ built via esbuild; all bundles parse. Load via chrome://extensions → Load unpacked → dist/. Remaining: API-linked file conversion, Firefox port, store packaging.
+
+## Sponsors
+
+Dhiva Labs is an independent, self-funded lab. [Sponsorships](https://github.com/sponsors/Dhiva-Labs) help bring this project and the rest of Dhiva Labs to every platform, iPhone and Mac included.
+
+[![Sponsor Dhiva Labs](https://img.shields.io/badge/Sponsor-Dhiva%20Labs-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Dhiva-Labs)
+
+Monthly sponsors at $10 and up are listed here:
+
+<!-- sponsors -->
+*Be the first: [sponsor Dhiva Labs](https://github.com/sponsors/Dhiva-Labs).*
+<!-- sponsors -->
