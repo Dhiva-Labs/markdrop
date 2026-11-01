@@ -20,8 +20,9 @@ case "$MODE" in
   rpm-suse)
     zypper -n -q --gpg-auto-import-keys refresh
     tools=(file findutils which procps)
-    # xvfb-run needs awk, and dbus-run-session is not in dbus-1 there.
-    if [ -n "${GUI_CMD:-}" ]; then tools+=(xvfb-run gawk Mesa-dri dbus-1 /usr/bin/dbus-run-session python3); fi
+    # xvfb-run needs awk; dbus-run-session is in dbus-1-daemon there (zypper
+    # finds no provider for the /usr/bin path itself).
+    if [ -n "${GUI_CMD:-}" ]; then tools+=(xvfb-run gawk Mesa-dri dbus-1 dbus-1-daemon python3); fi
     zypper -n -q install "${tools[@]}"
     ;;
   pacman)
