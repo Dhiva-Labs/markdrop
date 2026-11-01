@@ -41,6 +41,7 @@ modules:
         path: com.dhivalabs.MarkdropStudio.metainfo.xml
     build-commands:
       # The app finds lib/, data/ and md-engine/ next to its executable.
+      - install -d /app/lib
       - cp -a tree/opt/markdrop-studio /app/lib/markdrop-studio
       - install -d /app/bin && ln -s ../lib/markdrop-studio/md_converter_desktop /app/bin/markdrop
       - install -Dm644 tree/usr/share/applications/markdrop-studio.desktop /app/share/applications/com.dhivalabs.MarkdropStudio.desktop
