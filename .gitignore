@@ -21,3 +21,6 @@ reference/
 # Keep the store-ready release folder (small) but not its rebuildable zip? No —
 # the CWS zip is ~40 KB and pinning the exact submitted artifact is useful.
 !01-browser-extension/release/*.zip
+
+# Markdrop Studio Flatpak: the .deb's tree, unpacked by CI
+03-desktop-app/packaging/flatpak/tree/

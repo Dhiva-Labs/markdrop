@@ -2,6 +2,7 @@
 
 [![ARM64 builds](https://github.com/Dhiva-Labs/markdrop/actions/workflows/studio-linux.yml/badge.svg?branch=main)](https://github.com/Dhiva-Labs/markdrop/actions/workflows/studio-linux.yml)
 ![Markdrop Studio: Linux x64 | arm64](https://img.shields.io/badge/Studio-Linux%20x64%20%7C%20arm64-informational?logo=linux&logoColor=white)
+![Linux: deb | rpm | Arch | AppImage | Flatpak](https://img.shields.io/badge/Linux-deb%20%7C%20rpm%20%7C%20Arch%20%7C%20AppImage%20%7C%20Flatpak-informational?logo=linux&logoColor=white)
 
 **Markdrop** is the suite brand: Markdrop Clipper (extension), Markdrop (mobile), Markdrop Studio (desktop), Markdrop Web + API, markdrop-mcp (Claude connector), Markdrop Bot (Telegram). All products carry "from Dhiva Labs" attribution and emit front-matter generator strings `dhiva-labs/markdrop-<product>`.
 
@@ -27,6 +28,30 @@ so nothing else needs installing except GTK 3. CI builds both packages on native
 (`.github/workflows/studio-linux.yml`), runs the engine's golden tests and the app's
 `--selftest` on each architecture, and attaches them to published releases. They are built on
 Ubuntu 24.04, so they need that release's C library or newer.
+
+### Other Linux distributions
+
+From the next release on, the same build is also attached as packages for other distributions
+(x86-64 file names shown; the arm64 files end in `aarch64`):
+
+| Distribution | Asset | Install |
+|---|---|---|
+| Fedora, RHEL/Rocky/Alma | `markdrop-studio-<version>-1.x86_64.rpm` | `sudo dnf install ./markdrop-studio-<version>-1.x86_64.rpm` |
+| openSUSE Tumbleweed | the same `.rpm` | `sudo zypper install --allow-unsigned-rpm ./markdrop-studio-<version>-1.x86_64.rpm` |
+| Arch, Manjaro, EndeavourOS | `markdrop-studio-<version>-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./markdrop-studio-<version>-1-x86_64.pkg.tar.zst` |
+| AUR | `markdrop-studio-bin-<version>-aur.tar.gz` (PKGBUILD + .SRCINFO) | `markdrop-studio-bin` in the AUR once published |
+| any glibc distribution | `MarkdropStudio-<version>-x86_64.AppImage` | `chmod +x MarkdropStudio-<version>-x86_64.AppImage && ./MarkdropStudio-<version>-x86_64.AppImage` |
+| any distribution with Flatpak | `markdrop-studio-<version>-x86_64.flatpak` | `flatpak install --user ./markdrop-studio-<version>-x86_64.flatpak` (the GNOME runtime comes from Flathub) |
+
+All of them repackage the `.deb`'s files, so they behave the same. Built on Ubuntu 24.04, the
+`.rpm`, Arch package and AppImage need glibc 2.38 or newer and GTK 3 (Fedora 39+, openSUSE
+Tumbleweed, current Arch; not RHEL 9 or openSUSE Leap 15); the Flatpak brings its own runtime.
+The `.rpm` is unsigned, hence zypper's `--allow-unsigned-rpm`. The Flatpak can read your home
+directory (dropped files arrive as plain paths) and saves through the file chooser portal; see
+`03-desktop-app/packaging/flatpak/README.md`. CI installs each package on Fedora, openSUSE
+Tumbleweed and Arch Linux (the AppImage on Fedora, the Flatpak on Ubuntu with the Flathub
+runtime) on both architectures and runs the app's `--selftest` there; Arch Linux has no official
+arm64 image, so the arm64 Arch package gets a static check only.
 
 ## Layout
 - `MASTER_PLAN.md` — suite overview, shared architecture, build order, open questions.
