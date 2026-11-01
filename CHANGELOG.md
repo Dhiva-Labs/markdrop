@@ -5,6 +5,15 @@ The repository holds several products that are versioned on their own: the brows
 tagged release (`vX.Y.Z`) is the suite release; the component files it carries keep their own
 version in the file name.
 
+## Unreleased
+
+### Added
+- Markdrop Studio packages for other Linux distributions, repackaged from the `.deb` for amd64
+  and arm64: `.rpm` (Fedora, RHEL, openSUSE), Arch Linux package, AppImage, Flatpak bundle
+  (`com.dhivalabs.MarkdropStudio`, GNOME 51 runtime) and an AUR PKGBUILD
+  (`markdrop-studio-bin`). `studio-linux.yml` installs each on its distribution, runs the app's
+  `--selftest` there, and attaches the files to a published release.
+
 ## v0.1.1 - 2026-10-16
 
 ### Added

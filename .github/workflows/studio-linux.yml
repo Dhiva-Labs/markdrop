@@ -2,12 +2,15 @@ name: Markdrop Studio (Linux)
 
 # Builds Markdrop Studio, the desktop app in 03-desktop-app, for Linux x64 and
 # Linux arm64: the PyInstaller-frozen markitdown engine on the native runner,
-# the Flutter app, and a .deb that bundles both.
+# the Flutter app, and a .deb that bundles both. Each .deb is then repackaged
+# as an .rpm (Fedora, RHEL, openSUSE), an Arch package, an AppImage and a
+# Flatpak, plus an AUR PKGBUILD, and every one of them is installed on its
+# distribution and put through the app's self-test there.
 #
-# When a release is published, the .debs are attached to it. The release itself
+# When a release is published, all of these files are attached to it. The release itself
 # and the assets uploaded by hand are never touched: a file whose name is
 # already on the release is skipped, so a hand-built amd64 .deb wins and CI
-# fills in what is missing (the arm64 .deb). To attach the .debs to a release
+# fills in what is missing (the arm64 .deb). To attach the files to a release
 # that is already published, run this workflow by hand and give it the tag.
 
 on:
@@ -23,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Attach the .debs to this existing release (leave empty to only build)
+        description: Attach the Linux packages to this existing release (leave empty to only build)
         type: string
         default: ''
   release:
@@ -288,9 +291,242 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Repackages each architecture's .deb for Fedora/RHEL/openSUSE (.rpm),
+  # Arch (.pkg.tar.zst) and any glibc distribution (AppImage), then installs
+  # every one of them on the real distribution and runs the self-test there
+  # (03-desktop-app/packaging/linux-distros/).
+  distros:
+    name: Other distros ${{ matrix.arch }}
+    needs: [version, studio]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, deb_arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, deb_arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      NFPM_VERSION: '2.48.0'
+      APPIMAGETOOL_VERSION: '1.9.1'
+      DEB_VERSION: ${{ needs.version.outputs.deb_version }}
+      TEST_FILES: ${{ github.workspace }}/reference/markitdown/packages/markitdown/tests/test_files
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-${{ matrix.arch }}
+          path: deb
+
+      - name: Install nfpm and appimagetool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$(uname -m)" in
+            x86_64) nfpm_arch=x86_64; ai_arch=x86_64 ;;
+            aarch64) nfpm_arch=arm64; ai_arch=aarch64 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          tarball="nfpm_${NFPM_VERSION}_Linux_${nfpm_arch}.tar.gz"
+          gh release download "v$NFPM_VERSION" -R goreleaser/nfpm -p "$tarball" -p checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" nfpm
+          gh release download "$APPIMAGETOOL_VERSION" -R AppImage/appimagetool \
+            -p "appimagetool-$ai_arch.AppImage" -O appimagetool
+          chmod +x appimagetool
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch markitdown's test files
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse --branch "v${MARKITDOWN_VERSION}" \
+            https://github.com/microsoft/markitdown.git reference/markitdown
+          git -C reference/markitdown sparse-checkout set packages/markitdown/tests/test_files
+          ls "$TEST_FILES/test.docx" "$TEST_FILES/test.pdf" "$TEST_FILES/test.pptx" "$TEST_FILES/test.xlsx"
+
+      - name: Build .rpm, Arch package and AppImage
+        run: |
+          dpkg-deb -x "deb/markdrop-studio_${DEB_VERSION}_${{ matrix.deb_arch }}.deb" "$RUNNER_TEMP/root"
+          VERSION="$DEB_VERSION" 03-desktop-app/packaging/linux-distros/pack.sh \
+            "$RUNNER_TEMP/root" ${{ matrix.deb_arch }} dist
+          # The Flatpak job builds from the same tree; tar keeps modes and symlinks.
+          tar -C "$RUNNER_TEMP/root" -cJf "$RUNNER_TEMP/tree.tar.xz" .
+
+      - name: Install and run on Fedora, openSUSE and Arch
+        env:
+          SMOKE_DATA: ${{ env.TEST_FILES }}
+        run: 03-desktop-app/packaging/linux-distros/verify.sh dist ${{ matrix.deb_arch }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: distros-${{ matrix.arch }}
+          path: |
+            dist/*.rpm
+            dist/*.pkg.tar.zst
+            dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tree-${{ matrix.arch }}
+          path: ${{ runner.temp }}/tree.tar.xz
+          if-no-files-found: error
+          retention-days: 3
+
+  # AUR recipe: PKGBUILD + .SRCINFO for markdrop-studio-bin, rendered with
+  # the checksums of the .debs the release carries and proven with makepkg on
+  # archlinux:latest, followed by the self-test.
+  aur:
+    name: AUR PKGBUILD
+    needs: [version, studio]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DEB_VERSION: ${{ needs.version.outputs.deb_version }}
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+      TEST_FILES: ${{ github.workspace }}/reference/markitdown/packages/markitdown/tests/test_files
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: deb-*
+          path: debs
+          merge-multiple: true
+
+      # A .deb that is already on the release (uploaded by hand) is the one
+      # the release job keeps, so the PKGBUILD must carry its checksum.
+      - name: Use the release's own .debs where it has them
+        if: env.TAG != ''
+        run: |
+          existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
+          for arch in amd64 arm64; do
+            name="markdrop-studio_${DEB_VERSION}_${arch}.deb"
+            if printf '%s\n' "$existing" | grep -qxF -- "$name"; then
+              echo "using $name from release $TAG"
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p "$name" -D debs --clobber
+            fi
+          done
+
+      - name: Fetch markitdown's test files
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse --branch "v${MARKITDOWN_VERSION}" \
+            https://github.com/microsoft/markitdown.git reference/markitdown
+          git -C reference/markitdown sparse-checkout set packages/markitdown/tests/test_files
+
+      - name: Render and check the PKGBUILD
+        env:
+          RELEASE_TAG: ${{ env.TAG }}
+          SMOKE_DATA: ${{ env.TEST_FILES }}
+        run: |
+          VERSION="$DEB_VERSION" 03-desktop-app/packaging/arch/aur.sh \
+            "debs/markdrop-studio_${DEB_VERSION}_amd64.deb" "debs/markdrop-studio_${DEB_VERSION}_arm64.deb" dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aur
+          path: dist/*-aur.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # Builds the Flatpak bundle from the same installed tree, inside the
+  # Flathub builder image (03-desktop-app/packaging/flatpak/).
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    needs: [version, distros]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, fp_arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: arm64, fp_arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: tree-${{ matrix.arch }}
+          path: tree-artifact
+
+      - name: Unpack the installed tree
+        run: |
+          mkdir -p 03-desktop-app/packaging/flatpak/tree
+          tar -xJf tree-artifact/tree.tar.xz -C 03-desktop-app/packaging/flatpak/tree
+          rm -rf tree-artifact
+
+      # The action's own artifact upload is off: the bundle is uploaded as a
+      # release file only by flatpak-test, after it has been installed and run.
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: 03-desktop-app/packaging/flatpak/com.dhivalabs.MarkdropStudio.yml
+          bundle: markdrop-studio-${{ needs.version.outputs.deb_version }}-${{ matrix.fp_arch }}.flatpak
+          arch: ${{ matrix.fp_arch }}
+          cache: false
+          upload-artifact: false
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flatpak-build-${{ matrix.arch }}
+          path: markdrop-studio-${{ needs.version.outputs.deb_version }}-${{ matrix.fp_arch }}.flatpak
+          if-no-files-found: error
+          retention-days: 3
+
+  # Installs the bundle on the runner the way a user would (GNOME runtime
+  # from Flathub) and runs it: ldd inside the sandbox, the self-test on the
+  # four documents, and the window staying up.
+  flatpak-test:
+    name: Flatpak ${{ matrix.arch }} install and run
+    needs: [version, flatpak]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    env:
+      TEST_FILES: ${{ github.workspace }}/reference/markitdown/packages/markitdown/tests/test_files
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: flatpak-build-${{ matrix.arch }}
+          path: bundle
+
+      - name: Fetch markitdown's test files
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse --branch "v${MARKITDOWN_VERSION}" \
+            https://github.com/microsoft/markitdown.git reference/markitdown
+          git -C reference/markitdown sparse-checkout set packages/markitdown/tests/test_files
+
+      - name: Install flatpak and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak xvfb xauth dbus-bin dbus-daemon
+
+      - name: Install the bundle and run it
+        run: sudo 03-desktop-app/packaging/flatpak/test-bundle.sh bundle/*.flatpak "$TEST_FILES"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: bundle/*.flatpak
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Release assets
-    needs: [version, studio]
+    needs: [version, studio, distros, aur, flatpak-test]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -306,15 +542,45 @@ jobs:
           path: assets
           merge-multiple: true
 
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: distros-*
+          path: assets
+          merge-multiple: true
+
+      # By name: the pattern flatpak-* would also match the untested
+      # flatpak-build-* bundles.
+      - uses: actions/download-artifact@v8
+        with:
+          name: flatpak-x64
+          path: assets
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: flatpak-arm64
+          path: assets
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: aur
+          path: assets
+
       - name: Check the release assets
         run: |
           ls -l assets
-          [ "$(ls assets | wc -l)" -eq 2 ]
+          [ "$(ls assets | wc -l)" -eq 11 ]
           for arch in amd64 arm64; do
             deb="assets/markdrop-studio_${DEB_VERSION}_${arch}.deb"
             [ "$(dpkg-deb --field "$deb" Architecture)" = "$arch" ]
             [ "$(dpkg-deb --field "$deb" Version)" = "$DEB_VERSION" ]
           done
+          for a in x86_64 aarch64; do
+            for f in "markdrop-studio-${DEB_VERSION}-1.$a.rpm" "markdrop-studio-${DEB_VERSION}-1-$a.pkg.tar.zst" \
+                     "MarkdropStudio-${DEB_VERSION}-$a.AppImage" "markdrop-studio-${DEB_VERSION}-$a.flatpak"; do
+              [ -f "assets/$f" ] || { echo "::error::missing $f"; exit 1; }
+            done
+          done
+          [ -f "assets/markdrop-studio-bin-${DEB_VERSION}-aur.tar.gz" ]
 
       # Names already on the release are skipped (hand-uploaded files win), so
       # nothing is overwritten. The checksums of what this job uploads go into
@@ -325,7 +591,7 @@ jobs:
           existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name')"
           uploaded=0
           : > SHA256SUMS-studio-linux.txt
-          for f in assets/*.deb; do
+          for f in assets/*; do
             name="$(basename "$f")"
             if printf '%s\n' "$existing" | grep -qxF -- "$name"; then
               echo "skip $name (already on the release)"

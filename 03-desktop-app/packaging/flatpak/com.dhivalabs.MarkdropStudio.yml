@@ -1,0 +1,49 @@
+# Flatpak manifest for Markdrop Studio.
+#
+# Like the .rpm, Arch package and AppImage, this repackages the installed
+# tree of the .deb that CI builds (unpacked into packaging/flatpak/tree/ by
+# the workflow), so the Flatpak ships the same binaries as every other format
+# (the Flutter app and the PyInstaller-frozen markitdown engine) instead of a
+# second build inside the sandbox. A Flathub submission needs `tree` swapped
+# for an archive source (release URL + sha256); see README.md in this
+# directory.
+id: com.dhivalabs.MarkdropStudio
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+command: markdrop
+finish-args:
+  # GTK needs a display socket; fallback-x11 covers X11-only desktops.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # GPU acceleration for Flutter's renderer.
+  - --device=dri
+  # Converting a web page or a YouTube link downloads it.
+  - --share=network
+  # Files dropped on the window arrive as host paths (desktop_drop reads the
+  # text/uri-list), which the engine opens directly. Read-only: converted
+  # Markdown is saved through the file chooser portal.
+  - --filesystem=home:ro
+modules:
+  - name: markdrop-studio
+    buildsystem: simple
+    build-options:
+      # The frozen engine's Python archive is appended to the md-engine
+      # executable; stripping or splitting off debug info would cut it off.
+      no-debuginfo: true
+      strip: false
+    sources:
+      - type: dir
+        path: tree
+        dest: tree
+      - type: file
+        path: com.dhivalabs.MarkdropStudio.metainfo.xml
+    build-commands:
+      # The app finds lib/, data/ and md-engine/ next to its executable.
+      - cp -a tree/opt/markdrop-studio /app/lib/markdrop-studio
+      - install -d /app/bin && ln -s ../lib/markdrop-studio/md_converter_desktop /app/bin/markdrop
+      - install -Dm644 tree/usr/share/applications/markdrop-studio.desktop /app/share/applications/com.dhivalabs.MarkdropStudio.desktop
+      - desktop-file-edit --set-icon=com.dhivalabs.MarkdropStudio --set-key=Exec --set-value=markdrop /app/share/applications/com.dhivalabs.MarkdropStudio.desktop
+      - install -Dm644 tree/usr/share/icons/hicolor/256x256/apps/markdrop-studio.png /app/share/icons/hicolor/256x256/apps/com.dhivalabs.MarkdropStudio.png
+      - install -Dm644 com.dhivalabs.MarkdropStudio.metainfo.xml /app/share/metainfo/com.dhivalabs.MarkdropStudio.metainfo.xml

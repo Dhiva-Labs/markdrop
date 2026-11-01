@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.dhivalabs.MarkdropStudio</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Markdrop Studio</name>
+  <summary>Convert anything to Markdown</summary>
+  <description>
+    <p>Markdrop Studio is a drag-and-drop batch converter for PDF, Word, Excel, PowerPoint, EPUB and HTML files, web pages and YouTube links, with a rendered Markdown preview. Conversion runs locally through the bundled markitdown engine.</p>
+  </description>
+  <launchable type="desktop-id">com.dhivalabs.MarkdropStudio.desktop</launchable>
+  <url type="homepage">https://github.com/Dhiva-Labs/markdrop</url>
+  <url type="bugtracker">https://github.com/Dhiva-Labs/markdrop/issues</url>
+  <developer id="com.dhivalabs">
+    <name>Dhiva Labs</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.2" date="2026-10-16"/>
+  </releases>
+</component>
