@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Markdrop Clipper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert web pages, selections, images and YouTube videos to Markdown. From Dhiva Labs.",
   "homepage_url": "https://github.com/Dhiva-Labs/Markdrop",
   "icons": {
