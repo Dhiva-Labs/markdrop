@@ -35,5 +35,7 @@ Everything is converted locally in your browser. No accounts, no tracking, no da
 
 Part of the Markdrop suite — from Dhiva Labs.
 
+YouTube, Obsidian, Notion and GitHub are trademarks of their respective owners. Markdrop Clipper is not affiliated with or endorsed by them.
+
 ## Language
 English

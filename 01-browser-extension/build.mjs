@@ -46,6 +46,16 @@ for (const { dir, firefox } of targets) {
   for (const size of [16, 32, 48, 128]) {
     cpSync(`icons/icon${size}.png`, `${dir}/icons/icon${size}.png`);
   }
+
+  // Licence texts: our MIT licence plus every bundled library's (MIT and
+  // Apache-2.0 both require the text to travel with the code).
+  mkdirSync(`${dir}/licenses`, { recursive: true });
+  cpSync("THIRD_PARTY_NOTICES.md", `${dir}/THIRD_PARTY_NOTICES.md`);
+  cpSync("../LICENSE", `${dir}/licenses/LICENSE.txt`);
+  cpSync("licenses/Apache-2.0.txt", `${dir}/licenses/Apache-2.0.txt`);
+  cpSync("node_modules/@mozilla/readability/LICENSE.md", `${dir}/licenses/readability-LICENSE.md`);
+  cpSync("node_modules/turndown/LICENSE", `${dir}/licenses/turndown-LICENSE.txt`);
+  cpSync("node_modules/turndown-plugin-gfm/LICENSE", `${dir}/licenses/turndown-plugin-gfm-LICENSE.txt`);
 }
 
 // Store zips
