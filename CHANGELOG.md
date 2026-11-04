@@ -5,36 +5,40 @@ The repository holds several products that are versioned on their own: the brows
 tagged release (`vX.Y.Z`) is the suite release; the component files it carries keep their own
 version in the file name.
 
-## Unreleased
-
-### Added
-- Markdrop Studio packages for other Linux distributions, repackaged from the `.deb` for amd64
-  and arm64: `.rpm` (Fedora, RHEL, openSUSE), Arch Linux package, AppImage, Flatpak bundle
-  (`com.dhivalabs.MarkdropStudio`, GNOME 51 runtime) and an AUR PKGBUILD
-  (`markdrop-studio-bin`). `studio-linux.yml` installs each on its distribution, runs the app's
-  `--selftest` there, and attaches the files to a published release.
-
-## v0.1.1 - 2026-10-16
+## v0.1.1 - 2026-11-05
 
 ### Added
 - Markdrop Studio for Linux arm64: `markdrop-studio_0.1.2_arm64.deb`, built and tested on a
   native arm64 runner (engine golden tests, frozen engine conversions, app self-test of the
   installed package), next to the amd64 package.
+- Markdrop Studio packages for other Linux distributions, repackaged from the `.deb` for amd64
+  and arm64: `.rpm` (Fedora, RHEL, openSUSE), Arch Linux package, AppImage, Flatpak bundle
+  (`com.dhivalabs.MarkdropStudio`, GNOME 51 runtime) and an AUR PKGBUILD
+  (`markdrop-studio-bin`). `studio-linux.yml` installs each on its distribution, runs the app's
+  `--selftest` there, and attaches the files to a published release.
 - `03-desktop-app/packaging/build_deb.sh`: one packaging script for the amd64 and arm64 .deb
   (the architecture comes from `dpkg --print-architecture`).
 - CI workflow `studio-linux.yml`: builds Studio for x64 and arm64 on every change to
-  `03-desktop-app/`, and attaches the .debs to a published release without replacing files that
-  are already on it.
+  `03-desktop-app/`, and attaches the packages to a published release without replacing files
+  that are already on it.
+- Clipper 0.1.1: both packages now carry `THIRD_PARTY_NOTICES.md` and a `licenses/` folder (our
+  MIT licence, the Apache-2.0 text, and the licence files of @mozilla/readability, Turndown and
+  turndown-plugin-gfm), which those licences require.
+- Clipper: `01-browser-extension/AMO_BUILD.md`, the steps addons.mozilla.org reviewers use to
+  rebuild the minified Firefox package from source.
 
 ### Changed
 - Studio .deb version is now `0.1.2` (`03-desktop-app/packaging/deb-version`). The amd64
   package shipped with v0.1.0 was `0.1.1`; the rebuilt packages get a new version so the two
   never share a version and a file name.
 - The Studio .deb is no longer amd64-only; the README documents both packages.
+- Clipper's Firefox package declares `data_collection_permissions: none`, which
+  addons.mozilla.org requires of new add-ons, and so needs Firefox 140 or later (was 128).
+- Clipper's `package.json` licence is `MIT`, matching the repository (it said `ISC`, npm's
+  default). The store listing copy adds a trademark notice for the products it names.
 
 ### Unchanged in this release
-- Clipper (Chrome and Firefox) 0.1.0, Mobile 0.1.0 APK, markdrop-mcp 0.1.0, Web and Bot: same
-  code and the same files as v0.1.0.
+- Mobile 0.1.0 APK and markdrop-mcp 0.1.0: same files as v0.1.0. Web and Bot: same code.
 
 ## v0.1.0 - 2026-07-20
 
