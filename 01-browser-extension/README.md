@@ -5,10 +5,12 @@ Convert web pages, selections, picked elements, images and YouTube videos to Mar
 ## Build & load
 ```bash
 npm install
-npm run build        # -> dist/
+npm run build        # -> dist/ (Chrome), dist-firefox/ (Firefox), dist-zips/
 npm test             # 12 pipeline tests (node --test + jsdom)
 ```
 Then Chrome/Edge/Brave → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the `dist/` folder.
+
+Firefox (140 or later): submitted to addons.mozilla.org, pending review. To try the build, open `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick `dist-firefox/manifest.json`. [AMO_BUILD.md](AMO_BUILD.md) has the reviewer build steps.
 
 ## Features
 - **Popup**: Article mode (Readability), Full page, Selection, and **Pick element** (hover-highlight overlay; shift-click to add blocks, Enter converts, Esc cancels; in-page Copy/Download toolbar).
@@ -32,4 +34,3 @@ build.mjs               # esbuild -> dist/
 ## Known limits (v0.1)
 - YouTube transcript uses the page's caption tracks (unofficial); if YouTube changes its layout, the parser falls back to a clear error. Metadata still converts.
 - "Convert link target" (send a linked .pdf/.docx to the project-04 API) is wired in options but lands in the next iteration.
-- Firefox port pending (manifest tweaks + `browser_specific_settings`).
