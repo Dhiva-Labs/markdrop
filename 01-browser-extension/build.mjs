@@ -29,8 +29,14 @@ for (const { dir, firefox } of targets) {
   const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
   if (firefox) {
     manifest.background = { scripts: ["background.js"] };
+    // AMO requires data_collection_permissions on new add-ons (Firefox 140+).
+    // Nothing leaves the device, so "none".
     manifest.browser_specific_settings = {
-      gecko: { id: "md-clipper@dhiva-labs", strict_min_version: "128.0" },
+      gecko: {
+        id: "md-clipper@dhiva-labs",
+        strict_min_version: "140.0",
+        data_collection_permissions: { required: ["none"] },
+      },
     };
   }
   writeFileSync(`${dir}/manifest.json`, JSON.stringify(manifest, null, 2));
