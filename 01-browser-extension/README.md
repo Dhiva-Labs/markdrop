@@ -10,7 +10,11 @@ npm test             # 12 pipeline tests (node --test + jsdom)
 ```
 Then Chrome/Edge/Brave → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick the `dist/` folder.
 
-Firefox (140 or later): submitted to addons.mozilla.org, pending review. To try the build, open `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick `dist-firefox/manifest.json`. [AMO_BUILD.md](AMO_BUILD.md) has the reviewer build steps.
+## Install from a store
+- **Chrome, Edge, Brave:** [Markdrop Clipper on the Chrome Web Store](https://chromewebstore.google.com/detail/faoajjlfiflbnegodccplgdhapoibhca)
+- **Firefox (140 or later):** [Markdrop Clipper on Firefox Add-ons](https://addons.mozilla.org/firefox/addon/markdrop-clipper/)
+
+To try a local Firefox build, open `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick `dist-firefox/manifest.json`. [AMO_BUILD.md](AMO_BUILD.md) has the reviewer build steps.
 
 ## Features
 - **Popup**: Article mode (Readability), Full page, Selection, and **Pick element** (hover-highlight overlay; shift-click to add blocks, Enter converts, Esc cancels; in-page Copy/Download toolbar).

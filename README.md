@@ -55,7 +55,7 @@ arm64 image, so the arm64 Arch package gets a static check only.
 
 ## Layout
 - `MASTER_PLAN.md` — suite overview, shared architecture, build order, open questions.
-- `01-browser-extension/` — MD Clipper (MV3, TS): page/selection/image/YouTube → md.
+- `01-browser-extension/` — MD Clipper (MV3, TS): page/selection/image/YouTube → md. On the [Chrome Web Store](https://chromewebstore.google.com/detail/faoajjlfiflbnegodccplgdhapoibhca) and [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/markdrop-clipper/).
 - `02-mobile-app/` — Flutter Android converter (Chaquopy-embedded markitdown).
 - `03-desktop-app/` — Flutter desktop (Linux/Win/Mac) + PyInstaller markitdown sidecar.
 - `04-web-app/` — FastAPI + static frontend; doubles as the suite's shared Conversion API.
