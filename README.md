@@ -6,6 +6,8 @@
 
 **Markdrop** is the suite brand: Markdrop Clipper (extension), Markdrop (mobile), Markdrop Studio (desktop), Markdrop Web + API, markdrop-mcp (Claude connector), Markdrop Bot (Telegram). All products carry "from Dhiva Labs" attribution and emit front-matter generator strings `dhiva-labs/markdrop-<product>`.
 
+**Documentation:** step-by-step guides at [learn.dhivalabs.com](https://learn.dhivalabs.com/apps/markdrop/): [install](https://learn.dhivalabs.com/apps/markdrop/install) · [beginner guide](https://learn.dhivalabs.com/apps/markdrop/getting-started) · [troubleshooting](https://learn.dhivalabs.com/apps/markdrop/faq). New to the topic? Try the [AI and local models](https://learn.dhivalabs.com/tracks/ai/) learning track.
+
 Multi-plan project built around Microsoft's [MarkItDown](https://github.com/microsoft/markitdown) (file → Markdown conversion engine).
 
 ## Install Markdrop Studio (Linux desktop)
